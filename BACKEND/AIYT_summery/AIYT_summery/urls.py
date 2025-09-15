@@ -21,3 +21,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('summery_generator.urls')),
 ]
+
+handler404 = 'summery_generator.views.error_404'
+handler500 = 'summery_generator.views.error_500'

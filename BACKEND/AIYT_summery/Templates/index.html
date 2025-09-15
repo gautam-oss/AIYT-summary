@@ -48,7 +48,7 @@
         }
     </style>
 </head>
-<body class="flex flex-col min-h-scrren bg-gray-100 font-sans antialised">
+<body class="flex flex-col min-h-screen bg-gray-100 font-sans antialiased">
     <!-- Navbar -->
     <nav class="bg-blue-600 p-4 text-white flex justify-between">
         <div>
@@ -60,7 +60,7 @@
         <a href="#" class="text-white hover:underline mx-4">
             Welcome {{ user.username }}
         </a>
-        <a href="/blog-list" class="text-white hover:underline mx-4">
+        <a href="{% url 'blog-list' %}" class="text-white hover:underline mx-4">
             Saved Blog Posts
         </a>
         <a href="{% url 'logout' %}" class="text-white hover:underline mx-4">
@@ -99,14 +99,17 @@
             <br>
 
             <!-- Youtube section -->
-            <div>
+            <form id="youtube-form">
+                {% csrf_token %}
                 <h2 class="text-xl mb-4 font-semibold">Enter Youtube Video Link</h2>
                 <div class="flex space-x-4">
                     <input id="youtubeLink" type="url" placeholder="Paste Youtube Link..." class="flex-grow p-2 border border-blue-400 rounded-l-md">
-                    <button id="generateBlogButton" class="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 transition-colors">Generate</button>
+                    <button id="generateBlogButton" type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-r-md hover:bg-blue-700 transition-colors">Generate</button>
                 </div>
-            </div>
+            </form>
 
+            <!-- Message Area -->
+            <div id="messageArea" class="mt-4"></div>
 
             <!-- section for loading circle -->
             <div style="display: none;" id="loading-circle" class="load"></div>
@@ -123,45 +126,65 @@
     </div>
 
 
-    <footer class="text-center p-4 text-blacl mt-6">
+    <footer class="text-center p-4 text-black mt-6">
         Powered by <a href="https://www.youtube.com/codewithtomi">Code With Tomi</a>
     </footer>
 
     <script>
-        document.getElementById('generateBlogButton').addEventListener('click', async () => {
-            
+        document.getElementById('youtube-form').addEventListener('submit', async (event) => {
+            event.preventDefault();
 
             const youtubeLink = document.getElementById('youtubeLink').value;
             const blogContent = document.getElementById('blogContent');
-            
-            if(youtubeLink) {
-                document.getElementById('loading-circle').style.display = 'block';
-                
-                blogContent.innerHTML = ''; // Clear previous content
+            const generateBlogButton = document.getElementById('generateBlogButton');
+            const loadingCircle = document.getElementById('loading-circle');
+            const messageArea = document.getElementById('messageArea');
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
 
-                const endpointUrl = '/generate-blog';
-                
-                try {
-                    const response = await fetch(endpointUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ link: youtubeLink })
-                    });
+            // Basic URL validation
+            if (!youtubeLink || !youtubeLink.includes('youtube.com')) {
+                messageArea.innerHTML = '<p class="text-red-500">Please enter a valid YouTube link.</p>';
+                return;
+            }
 
-                    const data = await response.json();
+            // Clear previous content and messages
+            blogContent.innerHTML = '';
+            messageArea.innerHTML = '';
 
-                    blogContent.innerHTML = data.content;
+            // Show loading state
+            loadingCircle.style.display = 'block';
+            generateBlogButton.disabled = true;
+            generateBlogButton.textContent = 'Generating...';
 
-                } catch (error) {
-                    console.error("Error occurred:", error);
-                    alert("Something went wrong. Please try again later.");
-                    
+            const endpointUrl = '/generate-blog/';
+
+            try {
+                const response = await fetch(endpointUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({ link: youtubeLink })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Something went wrong.');
                 }
-                document.getElementById('loading-circle').style.display = 'none';
-            } else {
-                alert("Please enter a YouTube link.");
+
+                const data = await response.json();
+                blogContent.innerHTML = data.content;
+                messageArea.innerHTML = '<p class="text-green-500">Blog post generated successfully!</p>';
+
+            } catch (error) {
+                console.error("Error occurred:", error);
+                messageArea.innerHTML = `<p class="text-red-500">${error.message}</p>`;
+            } finally {
+                // Hide loading state
+                loadingCircle.style.display = 'none';
+                generateBlogButton.disabled = false;
+                generateBlogButton.textContent = 'Generate';
             }
         });
     </script>
